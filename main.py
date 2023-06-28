@@ -22,6 +22,10 @@ FINISH_MASK = pygame.mask.from_surface(FINISH)
 #Setting FPS
 FPS = 60
 
+#Computer car path
+PATH = [(175, 119), (110, 70), (56, 133), (70, 481), (318, 731), (404, 680), (418, 521), (507, 475), (600, 551), (613, 715), (736, 713),
+        (734, 399), (611, 357), (409, 343), (433, 257), (697, 258), (738, 123), (581, 71), (303, 78), (275, 377), (176, 388), (178, 260)]
+
 #abstract class for cars that act as parent class
 class AbstractCar:
     IMG = RED_CAR
@@ -83,11 +87,69 @@ class PlayerCar(AbstractCar):
         self.vel = -self.vel
         self.move()
 
+class ComputerCar(AbstractCar):
+    IMG = GREEN_CAR
+    START_POS = (150,200)
+
+    def __init__(self, max_vel, rotation_vel, path=[]):
+        super().__init__(max_vel, rotation_vel)
+        self.path = path
+        self.current_point = 0
+        self.vel = max_vel
+    
+    def draw_points(self, win):
+        for point in self.path:
+            pygame.draw.circle(win, (0,255,0), point, 5)
+        
+    def draw(self,win):
+        super().draw(win)
+        #self.draw_points(win)
+
+    def calculate_angle(self):
+        target_x, target_y = self.path[self.current_point]
+        x_diff = target_x - self.x
+        y_diff = target_y - self.y
+        if y_diff == 0:
+            desired_radian_angle = math.pi/2
+        else:
+            desired_radian_angle = math.atan(x_diff/y_diff)
+        
+        if target_y > self.y:
+            desired_radian_angle += math.pi
+        
+        difference_in_angle = self.angle - math.degrees(desired_radian_angle)
+        if difference_in_angle >= 180:
+            difference_in_angle -= 360
+        
+        if difference_in_angle > 0:
+            self.angle -= min(self.rotation_vel, abs(difference_in_angle))
+            self.rotate(right=True)
+
+        else:
+            self.angle += min(self.rotation_vel, abs(difference_in_angle))
+            self.rotate(left=True)
+        
+    def update_path_point(self):
+        target = self.path[self.current_point]
+        rect = pygame.Rect(self.x, self.y, self.img.get_width(), self.img.get_height())
+        if rect.collidepoint(*target):
+            self.current_point += 1
+
+
+    def move(self):
+        if self.current_point >= len(self.path):
+            return
+        
+        self.calculate_angle()
+        self.update_path_point()
+        super().move()
+
 #Drawing the images on the screen
-def draw(win, imgs, player_car):
+def draw(win, imgs, player_car, computer_car):
     for img, pos in imgs:
         win.blit(img, pos)
     player_car.draw(win)
+    computer_car.draw(win)
     pygame.display.update()
 
 
@@ -109,14 +171,33 @@ def move_player(player_car):
     if not moved:
         player_car.reduce_speed()
 
+def handle_collision(player_car, computer_car):
+    if player_car.collide(TRACK_BORDER_MASK) != None:
+        player_car.bounce()
+
+    computer_finish_poi_collide = player_car.collide(FINISH_MASK, *FINISH_POS)
+    if computer_finish_poi_collide !=None:
+        player_car.reset()
+        computer_car.reset()
+
+    player_finish_poi_collide = player_car.collide(FINISH_MASK, *FINISH_POS)
+    if player_finish_poi_collide !=None: # The asterisk is used to unpack the tuple
+        if player_finish_poi_collide[1] ==0:
+            player_car.bounce()
+        else:
+            print("finish")
+            player_car.reset()
+            computer_car.reset()
+
 run = True
 clock = pygame.time.Clock()
 imgs =[(GRASS, (0,0)), (TRACK, (0,0)), (FINISH, FINISH_POS), (TRACK_BORDER, (0,0))]
-player_car = PlayerCar(8, 4)
+player_car = PlayerCar(4, 3)
+computer_car = ComputerCar(4, 3, PATH)
 while run:
     clock.tick(FPS)
 
-    draw(WIN, imgs, player_car)
+    draw(WIN, imgs, player_car, computer_car)
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -124,15 +205,7 @@ while run:
             break
 
     move_player(player_car)
-    if player_car.collide(TRACK_BORDER_MASK) != None:
-        player_car.bounce()
-
-    finish_poi_collide = player_car.collide(FINISH_MASK, *FINISH_POS)
-    if finish_poi_collide !=None: # The asterisk is used to unpack the tuple
-        if finish_poi_collide[1] ==0:
-            player_car.bounce()
-        else:
-            print("finish")
-            player_car.reset()
+    computer_car.move()
+    handle_collision(player_car, computer_car)
 
 pygame.quit()
