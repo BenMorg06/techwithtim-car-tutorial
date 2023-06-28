@@ -13,3 +13,8 @@ def blit_rotate_img(win, img, top_left, angle):
     # when rotating x and y change so this new rect tries to remove offset
     # gets rectangle from new rect and makes the center the top left of the new img the top left of the old img and gets the center from that
     win.blit(rotated_img, new_rect.topleft)
+
+#writing text to screen
+def blit_text_center(win, font, text):
+    render = font.render(text, 1, (200,200,200))
+    win.blit(render, (win.get_width()/2 - render.get_width()/2, win.get_height()/2 - render.get_height()/2))
